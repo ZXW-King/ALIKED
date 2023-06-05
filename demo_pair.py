@@ -22,7 +22,7 @@ class ImageLoader(object):
     def __getitem__(self, item):
         filename = self.images[item]
         img = cv2.imread(filename)   
-        return img
+        return img,filename
 
     def __len__(self):
         return self.N
@@ -77,7 +77,7 @@ def plot_matches(image0,
     mkpts0 = np.round(mkpts0).astype(int)
     mkpts1 = np.round(mkpts1).astype(int)
 
-    cv2.imshow('points',out)
+    points_out = out.copy()
     for kpt0, kpt1 in zip(mkpts0, mkpts1):
         (x0, y0), (x1, y1) = kpt0, kpt1
 
@@ -90,7 +90,7 @@ def plot_matches(image0,
                 (out.shape[1] - 150, out.shape[0] - 50),
                 cv2.FONT_HERSHEY_COMPLEX, 2, (0, 0, 255), 2)
 
-    return out
+    return out,points_out
     
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='ALIKED image pair Demo.')
@@ -107,6 +107,8 @@ if __name__ == '__main__':
                         help='Detector score threshold (default: 0.2).')
     parser.add_argument('--n_limit', type=int, default=5000,
                         help='Maximum number of keypoints to be detected (default: 5000).')
+    parser.add_argument('--write_dir', type=str, default='',
+                        help='Image save directory.')
     args = parser.parse_args()
 
     logging.basicConfig(level=logging.INFO)
@@ -121,19 +123,14 @@ if __name__ == '__main__':
     logging.info("Press 'space' to start. \nPress 'q' or 'ESC' to stop!")
 
     image_loader2 = ImageLoader(args.input2)
-    
-    # img_ref = image_loader[0]
-    # img_rgb = cv2.cvtColor(img_ref, cv2.COLOR_BGR2RGB)
-    # pred_ref = model.run(img_rgb)
-    # kpts_ref = pred_ref['keypoints']
-    # desc_ref = pred_ref['descriptors']
+
     sum_net_t = []
     sum_net_matches_t = []
     sum_total_t = []  # 初始化时间列表
     for i in range(len(image_loader)):
         start = time.time()
-        img = image_loader[i]
-        img2 = image_loader2[i]
+        img,img_name = image_loader[i]
+        img2,img2_name = image_loader2[i]
         if img is None or img2 is None:
             break
         img_rgb2 = cv2.cvtColor(img2, cv2.COLOR_BGR2RGB)
@@ -151,19 +148,28 @@ if __name__ == '__main__':
         matches = mnn_mather(desc_ref, desc)
         end2 = time.time()
         status = f"matches/keypoints: {len(matches)}/{len(kpts)}"
-        
-        vis_img = plot_matches(img2, img, kpts_ref, kpts, matches)
+
+        vis_img,points_out = plot_matches(img2, img, kpts_ref, kpts, matches)
 
         cv2.namedWindow(args.model)
         cv2.setWindowTitle(args.model, args.model + ': ' + status)
         cv2.putText(vis_img, "Press 'q' or 'ESC' to stop.", (10,30), cv2.FONT_HERSHEY_SIMPLEX,1, (0,0,255),2, cv2.LINE_AA)
+        cv2.imshow('points', points_out)
         cv2.imshow(args.model, vis_img)
+        save_img_path = args.write_dir
+        if save_img_path: # 匹配的图像文件保存
+            img_name = os.path.basename(img_name).split(".")[0]
+            os.makedirs(save_img_path,exist_ok=True)
+            out_file1 = os.path.join(save_img_path, "t" + img_name)
+            cv2.imwrite(out_file1, points_out)
+            out_file2 = os.path.join(save_img_path, "d" + img_name)
+            cv2.imwrite(out_file2, vis_img)
         end = time.time()
         net_t = end1 - start1
         net_matches_t = end2 - start1
         total_t = end - start
         print('Processed image %d (net: %.3f FPS,net+matches: %.3f FPS, total: %.3f FPS).' % (
-        i, net_t, net_matches_t, total_t))
+            i, net_t, net_matches_t, total_t))
         if i > 0 and i < 99:  # 剔除最后一张和第一张
             sum_net_t.append(net_t)
             sum_net_matches_t.append(net_matches_t)
