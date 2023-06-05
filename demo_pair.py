@@ -158,7 +158,7 @@ if __name__ == '__main__':
         cv2.imshow(args.model, vis_img)
         save_img_path = args.write_dir
         if save_img_path: # 匹配的图像文件保存
-            img_name = os.path.basename(img_name).split(".")[0]
+            img_name = os.path.basename(img_name)
             os.makedirs(save_img_path,exist_ok=True)
             out_file1 = os.path.join(save_img_path, "t" + img_name)
             cv2.imwrite(out_file1, points_out)
