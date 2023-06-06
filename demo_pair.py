@@ -1,3 +1,4 @@
+import csv
 import os
 import time
 
@@ -60,7 +61,7 @@ def plot_matches(image0,
                  matches,
                  radius=2,
                  color=(255, 0, 0),
-                 mcolor=(0, 255, 0)):
+                ):
 
     out0 = plot_keypoints(image0, kpts0, radius, color)
     out1 = plot_keypoints(image1, kpts1, radius, color)
@@ -80,7 +81,11 @@ def plot_matches(image0,
     points_out = out.copy()
     for kpt0, kpt1 in zip(mkpts0, mkpts1):
         (x0, y0), (x1, y1) = kpt0, kpt1
-
+        mcolor = (
+            np.random.randint(0, 255),
+            np.random.randint(0, 255),
+            np.random.randint(0, 255),
+        )
         cv2.line(out, (x0, y0), (x1 + W0, y1),
                      color=mcolor,
                      thickness=1,
@@ -98,7 +103,7 @@ if __name__ == '__main__':
                         help='Image directory.')
     parser.add_argument('--input2', type=str, default='',
                         help='Image directory.')
-    parser.add_argument('--model', choices=['aliked-t16', 'aliked-n16', 'aliked-n16rot', 'aliked-n32'], default="aliked-t16",
+    parser.add_argument('--model', choices=['aliked-t16', 'aliked-n16', 'aliked-n16rot', 'aliked-n32'], default="aliked-n16rot",
                         help="The model configuration")
     parser.add_argument('--device', type=str, default='cuda', help="Running device (default: cuda).")
     parser.add_argument('--top_k', type=int, default=-1,
@@ -154,16 +159,12 @@ if __name__ == '__main__':
         cv2.namedWindow(args.model)
         cv2.setWindowTitle(args.model, args.model + ': ' + status)
         cv2.putText(vis_img, "Press 'q' or 'ESC' to stop.", (10,30), cv2.FONT_HERSHEY_SIMPLEX,1, (0,0,255),2, cv2.LINE_AA)
+        cv2.putText(points_out, str(len(kpts)),
+                    (points_out.shape[1] - 150, points_out.shape[0] - 50),
+                    cv2.FONT_HERSHEY_COMPLEX, 2, (0, 0, 255), 2)
         cv2.imshow('points', points_out)
         cv2.imshow(args.model, vis_img)
         save_img_path = args.write_dir
-        if save_img_path: # 匹配的图像文件保存
-            img_name = os.path.basename(img_name)
-            os.makedirs(save_img_path,exist_ok=True)
-            out_file1 = os.path.join(save_img_path, "t" + img_name)
-            cv2.imwrite(out_file1, points_out)
-            out_file2 = os.path.join(save_img_path, "d" + img_name)
-            cv2.imwrite(out_file2, vis_img)
         end = time.time()
         net_t = end1 - start1
         net_matches_t = end2 - start1
@@ -174,6 +175,17 @@ if __name__ == '__main__':
             sum_net_t.append(net_t)
             sum_net_matches_t.append(net_matches_t)
             sum_total_t.append(total_t)
+        if save_img_path: # 匹配的图像文件保存
+            img_name = os.path.basename(img_name)
+            os.makedirs(save_img_path,exist_ok=True)
+            out_file1 = os.path.join(save_img_path, "t" + img_name)
+            cv2.imwrite(out_file1, points_out)
+            out_file2 = os.path.join(save_img_path, "d" + img_name)
+            cv2.imwrite(out_file2, vis_img)
+            log_file = os.path.join(save_img_path, "log.csv")
+            with open(log_file, 'a') as f:
+                writer = csv.writer(f)
+                writer.writerow([img_name, len(kpts),len(matches)])
         c = cv2.waitKey(1)
         if c == 32:
             while True:
@@ -183,8 +195,6 @@ if __name__ == '__main__':
         if c == ord('q') or c == 27:
             break
 
-        if i == 99:
-            break
     avg_net_FPS = sum(sum_net_t) / len(sum_net_t)
     avg_net_matches_FPS = sum(sum_net_matches_t) / len(sum_net_matches_t)
     avg_total_FPS = sum(sum_total_t) / len(sum_total_t)
