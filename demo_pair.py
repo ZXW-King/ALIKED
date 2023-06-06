@@ -171,7 +171,7 @@ if __name__ == '__main__':
         total_t = end - start
         print('Processed image %d (net: %.3f FPS,net+matches: %.3f FPS, total: %.3f FPS).' % (
             i, net_t, net_matches_t, total_t))
-        if i > 0 and i < 99:  # 剔除最后一张和第一张
+        if len(sum_net_t) < 102:  # 剔除最后一张和第一张  计算100张图片的平均帧率
             sum_net_t.append(net_t)
             sum_net_matches_t.append(net_matches_t)
             sum_total_t.append(total_t)
@@ -183,9 +183,9 @@ if __name__ == '__main__':
             out_file2 = os.path.join(save_img_path, "d" + img_name)
             cv2.imwrite(out_file2, vis_img)
             log_file = os.path.join(save_img_path, "log.csv")
-            with open(log_file, 'a') as f:
-                writer = csv.writer(f)
-                writer.writerow([img_name, len(kpts),len(matches)])
+            f = open(log_file, 'a')  # 记录图像的特征点和匹配数量
+            writer = csv.writer(f)
+            writer.writerow([img_name, len(kpts), len(matches)])
         c = cv2.waitKey(1)
         if c == 32:
             while True:
@@ -194,10 +194,12 @@ if __name__ == '__main__':
                     break
         if c == ord('q') or c == 27:
             break
-
-    avg_net_FPS = sum(sum_net_t) / len(sum_net_t)
-    avg_net_matches_FPS = sum(sum_net_matches_t) / len(sum_net_matches_t)
-    avg_total_FPS = sum(sum_total_t) / len(sum_total_t)
+    # 计算平均帧率
+    avg_net_FPS = np.mean(sum_net_t[1:len(sum_net_t) - 1])
+    avg_net_matches_FPS = np.mean(sum_net_matches_t[1:len(sum_net_matches_t) - 1])
+    avg_total_FPS = np.mean(sum_total_t[1:len(sum_total_t) - 1])
+    if args.write_dir: # 记录图像的平均帧率
+        writer.writerow([f'avg_net_FPS:{avg_net_FPS:.3f},avg_net+matches_FPS:{avg_net_matches_FPS:.3f},avg_total_FPS:{avg_total_FPS:.3f}'])
     print(
         f'avg_FPS：\n avg_net_FPS:{avg_net_FPS:.3f},avg_net+matches_FPS:{avg_net_matches_FPS:.3f},avg_total_FPS:{avg_total_FPS:.3f}')
     logging.info('Finished!')
